@@ -36,7 +36,7 @@
         <dependency>
             <groupId>org.stianloader</groupId>
             <artifactId>stianloader-remapper</artifactId>
-            <version>0.1.0-a20240424</version>
+            <version>0.1.0-a20240425.1</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>

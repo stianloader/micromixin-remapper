@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.jetbrains.annotations.ApiStatus.OverrideOnly;
 import org.jetbrains.annotations.Contract;
@@ -33,13 +34,18 @@ import org.stianloader.remapper.Remapper;
 public class MicromixinRemapper {
 
     @NotNull
-    private final HierarchyLister lister;
+    private static final String CALLBACK_INFO_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfo";
+    @NotNull
+    private static final String CALLBACK_INFO_RETURNABLE_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable";
+
+    @NotNull
+    private final MemberLister lister;
     @NotNull
     private final MappingLookup lookup;
     @NotNull
     private final MappingSink sink;
 
-    public MicromixinRemapper(@NotNull MappingLookup lookup, @NotNull MappingSink sink, @NotNull HierarchyLister lister) {
+    public MicromixinRemapper(@NotNull MappingLookup lookup, @NotNull MappingSink sink, @NotNull MemberLister lister) {
         this.lookup = lookup;
         this.sink = sink;
         this.lister = lister;
@@ -220,7 +226,7 @@ public class MicromixinRemapper {
         if (idxTarget != 0) {
             String errorPrefix = "An unexpected error occured while remapping @At.target in " + owner + "." + member;
             errorPrefix += ordinal < 0 ? ("[" + ordinal + "]: ") : ": ";
-            annot.values.set(idxTarget, this.remapTargetSelector(errorPrefix, (String) annot.values.get(idxTarget)));
+            annot.values.set(idxTarget, this.remapTargetSelector(errorPrefix, (String) annot.values.get(idxTarget), null, null));
         }
 
         if (idxDesc != 0) {
@@ -678,7 +684,42 @@ public class MicromixinRemapper {
                                 || name.equals("require")) {
                             // Nothing to do
                         } else if (name.equals("method") || name.equals("target")) {
-                            this.remapMethodSelectorList(value, node, method, targets);
+                            Type[] arguments = Type.getArgumentTypes(method.desc);
+                            boolean expectVoid = false;
+                            boolean foundCallbackInfo = false;
+                            int callbackInfoArgument;
+                            for (callbackInfoArgument = 0; callbackInfoArgument < arguments.length; callbackInfoArgument++) {
+                                Type arg = arguments[callbackInfoArgument];
+                                String descriptor = arg.getDescriptor();
+                                if ((expectVoid = descriptor.equals("L" + CALLBACK_INFO_CLASS + ";")) || descriptor.equals("L" + CALLBACK_INFO_RETURNABLE_CLASS + ";")) {
+                                    foundCallbackInfo = true;
+                                    break;
+                                }
+                            }
+                            if (!foundCallbackInfo) {
+                                throw new IllegalMixinException("@Inject annotated method " + node.name + "." + method.name + method.desc + " lacks type argument " + CALLBACK_INFO_CLASS + " or " + CALLBACK_INFO_RETURNABLE_CLASS);
+                            }
+
+                            final boolean expectVoidFinal = expectVoid; // Lambda workarounds
+                            final int capturedArgumentCount = callbackInfoArgument;
+                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
+                                if (inferredDescriptor.codePointAt(0) != '('
+                                        || expectVoidFinal != (inferredDescriptor.codePointBefore(inferredDescriptor.length()) == 'V')) {
+                                    return false;
+                                }
+
+                                Type[] inferredDescriptorArguments = Type.getArgumentTypes(inferredDescriptor);
+                                if (inferredDescriptorArguments.length < capturedArgumentCount) {
+                                    return false;
+                                }
+
+                                for (int j = 0; j < capturedArgumentCount; j++) {
+                                    if (!arguments[j].getDescriptor().equals(inferredDescriptorArguments[j].getDescriptor())) {
+                                        return false;
+                                    }
+                                }
+                                return true;
+                            });
                         } else {
                             this.logUnimplementedFeature("Unimplemented key in @Inject: " + name + " within node " + node.name);
                         }
@@ -698,7 +739,9 @@ public class MicromixinRemapper {
                                 || name.equals("require")) {
                             // Nothing to do
                         } else if (name.equals("method") || name.equals("target")) {
-                            this.remapMethodSelectorList(value, node, method, targets);
+                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
+                                return inferredDescriptor.codePointAt(0) == '(';
+                            });
                         } else {
                             this.logUnimplementedFeature("Unimplemented key in @Inject: " + name + " within node " + node.name);
                         }
@@ -714,7 +757,7 @@ public class MicromixinRemapper {
         }
     }
 
-    private void remapMethodSelectorList(Object selectors, @NotNull ClassNode originNode, MethodNode originMethod, @NotNull Collection<String> targets) throws IllegalMixinException, MissingFeatureException {
+    private void remapMethodSelectorList(Object selectors, @NotNull ClassNode originNode, MethodNode originMethod, @NotNull Collection<String> targets, @Nullable Predicate<@NotNull String> inferredDescriptorPredicate) throws IllegalMixinException, MissingFeatureException {
         @SuppressWarnings("unchecked")
         ListIterator<Object> it = ((List<Object>) selectors).listIterator();
         while (it.hasNext()) {
@@ -724,13 +767,13 @@ public class MicromixinRemapper {
             if (o instanceof AnnotationNode) {
                 this.remapDescAnnotation("Error while remapping @Desc selector in method " + originNode.name + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", targets, (AnnotationNode) o, false);
             } else {
-                it.set((Object) this.remapTargetSelector("Error while remapping target selector in method " + originNode.name + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", (String) o));
+                it.set((Object) this.remapTargetSelector("Error while remapping target selector in method " + originNode.name + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", (String) o, targets, inferredDescriptorPredicate));
             }
         }
     }
 
     @NotNull
-    private String remapTargetSelector(@NotNull String errorPrefix, String targetSelector) throws MissingFeatureException, IllegalMixinException {
+    private String remapTargetSelector(@NotNull String errorPrefix, String targetSelector, @Nullable Collection<@NotNull String> targets, @Nullable Predicate<@NotNull String> inferredDescriptorPredicate) throws MissingFeatureException, IllegalMixinException {
         {
             StringBuilder purged = new StringBuilder();
             for (int i = 0; i < targetSelector.length(); i++) {
@@ -783,6 +826,76 @@ public class MicromixinRemapper {
             name = targetSelector.substring(startName, endName);
         } else {
             name = null;
+        }
+
+        inferMember:
+        if (targets != null) {
+            if (owner != null) {
+                targets = Collections.singleton(owner);
+                if (name != null && desc != null) {
+                    break inferMember;
+                }
+            }
+
+            String remappedOwner = null;
+            boolean tornOwner = false;
+            String remappedName = null;
+            boolean tornName = false;
+            String remappedDesc = null;
+            boolean tornDesc = false;
+
+            List<MemberRef> allReferences = new ArrayList<>();
+            StringBuilder builder = new StringBuilder();
+            for (String ownerType : targets) {
+                Collection<MemberRef> references = this.lister.tryInferMember(ownerType, name, desc);
+                for (MemberRef ref : references) {
+                    if (inferredDescriptorPredicate != null && !inferredDescriptorPredicate.test(ref.getDesc())) {
+                        continue;
+                    } else {
+                        allReferences.add(ref);
+                    }
+                    String memberOwner = this.lookup.getRemappedClassName(ref.getOwner());
+                    String memberName;
+                    String memberDesc;
+                    if (ref.getDesc().codePointAt(0) == '(') {
+                        memberName = this.lookup.getRemappedMethodName(ref.getOwner(), ref.getName(), ref.getDesc());
+                        memberDesc = Remapper.getRemappedMethodDescriptor(this.lookup, ref.getDesc(), builder);
+                    } else {
+                        memberName = this.lookup.getRemappedFieldName(ref.getOwner(), ref.getName(), ref.getDesc());
+                        memberDesc = Remapper.getRemappedFieldDescriptor(this.lookup, ref.getDesc(), builder);
+                    }
+
+                    if (remappedOwner == null) {
+                        remappedOwner = memberOwner;
+                    } else if (!remappedOwner.equals(memberOwner)) {
+                        tornOwner = true;
+                    }
+                    if (remappedName == null) {
+                        remappedName = memberName;
+                    } else if (!remappedName.equals(memberName)) {
+                        tornName = true;
+                    }
+                    if (remappedDesc == null) {
+                        remappedDesc = memberDesc;
+                    } else if (!remappedDesc.equals(memberDesc)) {
+                        tornDesc = true;
+                    }
+                }
+            }
+
+            if (remappedDesc != null) {
+                assert remappedName != null;
+                assert remappedOwner != null;
+                if (tornOwner || tornName || tornDesc) {
+                    this.logUnimplementedFeature(errorPrefix + "The provided explicit target selector string is not fully qualified (that is the member either lacks a name, descriptor or owner or a combination thereof) and one of the missing components have torn mappings. Without the fully qualified member, the selector string cannot be adequately renamed as the actually targetted member is highly context-dependent. As such, this feature is not properly supported in micromixin-remapper. Potential ways of mitigating this issue involve: Implementing this feature yourself, using the fully qualified target selector or using @Desc (@Desc has more strongly defined behaviour when it comes to unspecified parts of the selector, but may not be recommended in most toolchains. However it's use is acceptable and even recommended within the stianloader toolchain - while minecraft-specific toolchains generally advise against the use of @Desc).\n\nList of all candidate references (for debugging purposes:)" + allReferences);
+                }
+                builder.setLength(0);
+                builder.appendCodePoint('L').append(remappedOwner).appendCodePoint(';');
+                builder.append(remappedName);
+                builder.appendCodePoint(remappedDesc.codePointAt(0) != '(' ? ':' : ' ');
+                builder.append(remappedDesc);
+                return builder.toString();
+            }
         }
 
         if (owner == null || name == null || desc == null) {
