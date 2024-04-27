@@ -520,7 +520,8 @@ public class MicromixinRemapper {
                     }
 
                     String shadowName = field.name;
-                    if (field.name.startsWith(remapPrefix)) {
+                    boolean prefixed = field.name.startsWith(remapPrefix);
+                    if (prefixed) {
                         shadowName = field.name.substring(remapPrefix.length());
                     }
 
@@ -538,7 +539,10 @@ public class MicromixinRemapper {
                     }
 
                     if (remappedShadowName != null) {
-                        this.sink.remapMember(new MemberRef(node.name, field.name, field.desc), remapPrefix + remappedShadowName);
+                        if (prefixed) {
+                            remappedShadowName = remapPrefix + remappedShadowName;
+                        }
+                        this.sink.remapMember(new MemberRef(node.name, field.name, field.desc), remappedShadowName);
                     }
                 } else if (annot.desc.equals("Lorg/spongepowered/asm/mixin/Unique;")) {
                     if (mainAnnotation != null) {
