@@ -73,7 +73,7 @@ public class MicromixinRemapper {
             for (int i = 0; i < annot.values.size(); i += 2) {
                 String name = (String) annot.values.get(i);
                 Object value = annot.values.get(i + 1);
-                if (name.equals("alias")) {
+                if (name.equals("aliases")) {
                     @SuppressWarnings("unchecked")
                     List<String> aliases = (List<String>) (List<?>) value;
                     for (int j = 0; j < aliases.size(); j++) {
@@ -490,7 +490,7 @@ public class MicromixinRemapper {
                         Object value = annot.values.get(i + 1);
                         if (name.equals("prefix")) {
                             remapPrefix = (String) value;
-                        } else if (name.equals("alias")) {
+                        } else if (name.equals("aliases")) {
                             @SuppressWarnings("unchecked")
                             List<String> aliases = (List<String>) (List<?>) value;
                             for (int j = 0; j < aliases.size(); j++) {
@@ -560,7 +560,7 @@ public class MicromixinRemapper {
             }
         }
 
-        // TODO implement field overlay/shadow/overwrite
+        // TODO implement implicit field overlay/shadow/overwrite
     }
 
     private void remapMethod(@NotNull ClassNode node, MethodNode method, @NotNull Collection<@NotNull String> targets) throws MissingFeatureException, IllegalMixinException {
@@ -584,7 +584,7 @@ public class MicromixinRemapper {
                         Object value = annot.values.get(i + 1);
                         if (name.equals("prefix")) {
                             remapPrefix = (String) value;
-                        } else if (name.equals("alias")) {
+                        } else if (name.equals("aliases")) {
                             @SuppressWarnings("unchecked")
                             List<String> aliases = (List<String>) (List<?>) value;
                             for (int j = 0; j < aliases.size(); j++) {
@@ -645,7 +645,8 @@ public class MicromixinRemapper {
                                         + "\t2. Do not implement the interface in the mixin.\n"
                                         + "\t3. Use an @Invoker (not supported by micromixin as of April 2024)\n"
                                         + "\t4. Use @Intrinsic (not supported by micromixin as of April 2024)\n"
-                                        + "\t5. Report this behaviour as unintended to the micromixin-remapper developers (please also include the mixin itself and a short statement on why the behaviour should change)");
+                                        + "\t5. Use @Unique with silent = true\n"
+                                        + "\t6. Report this behaviour as unintended to the micromixin-remapper developers (please also include the mixin itself and a short statement on why the behaviour should change)");
                             }
                         }
                     }
