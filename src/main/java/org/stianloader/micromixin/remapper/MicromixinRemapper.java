@@ -22,6 +22,8 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.stianloader.micromixin.remapper.selectors.AtSelector;
+import org.stianloader.micromixin.remapper.selectors.ConstantSelector;
+import org.stianloader.micromixin.remapper.selectors.FieldSelector;
 import org.stianloader.micromixin.remapper.selectors.HeadSelector;
 import org.stianloader.micromixin.remapper.selectors.InvokeSelector;
 import org.stianloader.micromixin.remapper.selectors.ReturnSelector;
@@ -172,6 +174,12 @@ public class MicromixinRemapper {
         case "org.spongepowered.asm.mixin.injection.points.BeforeFinalReturn":
         case "TAIL":
             return TailSelector.INSTANCE;
+        case "org.spongepowered.asm.mixin.injection.points.BeforeConstant":
+        case "CONSTANT":
+            return ConstantSelector.INSTANCE;
+        case "org.spongepowered.asm.mixin.injection.points.BeforeFieldAccess":
+        case "FIELD":
+            return FieldSelector.INSTANCE;
         default:
             return null;
         }
@@ -421,7 +429,7 @@ public class MicromixinRemapper {
                 }
             }
             if (idxOwner != 0) {
-                descAnnot.values.set(idxOwner, Type.getType(this.lookup.getRemappedClassName(owner)));
+                descAnnot.values.set(idxOwner, Type.getObjectType(this.lookup.getRemappedClassName(owner)));
             }
         } else {
             String mappedName = null;
@@ -751,6 +759,30 @@ public class MicromixinRemapper {
                             this.logUnimplementedFeature("Unimplemented key in @Inject: " + name + " within node " + node.name);
                         }
                     }
+                } else if (annot.desc.equals("Lorg/spongepowered/asm/mixin/injection/Redirect;")) {
+                    if (mainAnnotation != null) {
+                        throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
+                    }
+                    mainAnnotation = annot.desc;
+                    for (int i = 0; i < annot.values.size(); i += 2) {
+                        String name = (String) annot.values.get(i);
+                        Object value = annot.values.get(i + 1);
+                        if (name.equals("at")) {
+                            this.remapAt(node.name, method.name + method.desc, -1, targets, (AnnotationNode) value);
+                        } else if (name.equals("slice")) {
+                            this.remapSlice(node.name, node.name + method.desc, -1, targets, (AnnotationNode) value);
+                        } else if (name.equals("expect")
+                                || name.equals("allow")
+                                || name.equals("require")) {
+                            // Nothing to do
+                        } else if (name.equals("method") || name.equals("target")) {
+                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
+                                return inferredDescriptor.codePointAt(0) == '(';
+                            });
+                        } else {
+                            this.logUnimplementedFeature("Unimplemented key in @Inject: " + name + " within node " + node.name);
+                        }
+                    }
                 } else {
                     this.logUnimplementedFeature("Unknown mixin annotation on method " + node.name + "." + method.name + method.desc + ": " + annot.desc);
                 }
@@ -773,6 +805,21 @@ public class MicromixinRemapper {
                 this.remapDescAnnotation("Error while remapping @Desc selector in method " + originNode.name + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", targets, (AnnotationNode) o, false);
             } else {
                 it.set((Object) this.remapTargetSelector("Error while remapping target selector in method " + originNode.name + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", (String) o, targets, inferredDescriptorPredicate));
+            }
+        }
+    }
+
+    private void remapSlice(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
+        for (int i = 0; i < annot.values.size(); i += 2) {
+            switch ((String) annot.values.get(i)) {
+            case "from":
+            case "to":
+                this.remapAt(owner, member + ".slice[" + ordinal + "]", annot.values.get(i).equals("from") ? 0 : 1, targets, (AnnotationNode) annot.values.get(i + 1));
+                break;
+            case "id":
+                break;
+            default:
+                this.logUnimplementedFeature("Unknown annotation element for @Slice found in " + owner + "." + member + "[" + ordinal + "]: " + annot.values.get(i));
             }
         }
     }
