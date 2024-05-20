@@ -756,7 +756,7 @@ public class MicromixinRemapper {
                                 return inferredDescriptor.codePointAt(0) == '(';
                             });
                         } else {
-                            this.logUnimplementedFeature("Unimplemented key in @Inject: " + name + " within node " + node.name);
+                            this.logUnimplementedFeature("Unimplemented key in @ModifyArg: " + name + " within node " + node.name);
                         }
                     }
                 } else if (annot.desc.equals("Lorg/spongepowered/asm/mixin/injection/Redirect;")) {
@@ -780,7 +780,29 @@ public class MicromixinRemapper {
                                 return inferredDescriptor.codePointAt(0) == '(';
                             });
                         } else {
-                            this.logUnimplementedFeature("Unimplemented key in @Inject: " + name + " within node " + node.name);
+                            this.logUnimplementedFeature("Unimplemented key in @Redirect: " + name + " within node " + node.name);
+                        }
+                    }
+                } else if (annot.desc.equals("Lcom/llamalad7/mixinextras/injector/ModifyReturnValue;")) {
+                    if (mainAnnotation != null) {
+                        throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
+                    }
+                    mainAnnotation = annot.desc;
+                    for (int i = 0; i < annot.values.size(); i += 2) {
+                        String name = (String) annot.values.get(i);
+                        Object value = annot.values.get(i + 1);
+                        if (name.equals("at")) {
+                            this.remapAtArray(node.name, method.name + method.desc, targets, value);
+                        } else if (name.equals("expect")
+                                || name.equals("allow")
+                                || name.equals("require")) {
+                            // Nothing to do
+                        } else if (name.equals("method") || name.equals("target")) {
+                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
+                                return inferredDescriptor.codePointAt(0) == '(';
+                            });
+                        } else {
+                            this.logUnimplementedFeature("Unimplemented key in @ModifyReturnValue: " + name + " within node " + node.name);
                         }
                     }
                 } else {
