@@ -21,6 +21,7 @@ import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.stianloader.micromixin.remapper.AnnotationRemapper.RemapContext;
 import org.stianloader.micromixin.remapper.selectors.AtSelector;
 import org.stianloader.micromixin.remapper.selectors.ConstantSelector;
 import org.stianloader.micromixin.remapper.selectors.FieldSelector;
@@ -36,9 +37,9 @@ import org.stianloader.remapper.Remapper;
 public class MicromixinRemapper {
 
     @NotNull
-    private static final String CALLBACK_INFO_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfo";
+    static final String CALLBACK_INFO_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfo";
     @NotNull
-    private static final String CALLBACK_INFO_RETURNABLE_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable";
+    static final String CALLBACK_INFO_RETURNABLE_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable";
 
     @NotNull
     private final MemberLister lister;
@@ -185,7 +186,7 @@ public class MicromixinRemapper {
         }
     }
 
-    private void remapAt(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
+    void remapAt(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
         int idxValue = 0;
         int idxArgs = 0;
         int idxTarget = 0;
@@ -245,7 +246,7 @@ public class MicromixinRemapper {
         }
     }
 
-    private void remapAtArray(@NotNull String owner, @NotNull String method, @NotNull Collection<String> targets, Object nodes) throws IllegalMixinException, MissingFeatureException {
+    void remapAtArray(@NotNull String owner, @NotNull String method, @NotNull Collection<String> targets, Object nodes) throws IllegalMixinException, MissingFeatureException {
         int ordinal = 0;
         for (Object node : (Iterable<?>) nodes) {
             this.remapAt(owner, method, ordinal++, targets, (AnnotationNode) node);
@@ -681,132 +682,17 @@ public class MicromixinRemapper {
                     }
                     mainAnnotation = annot.desc;
                     this.handleOverwrite(annot, targets, node, method);
-                } else if (annot.desc.equals("Lorg/spongepowered/asm/mixin/injection/Inject;")) {
-                    if (mainAnnotation != null) {
-                        throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
-                    }
-                    mainAnnotation = annot.desc;
-                    for (int i = 0; i < annot.values.size(); i += 2) {
-                        String name = (String) annot.values.get(i);
-                        Object value = annot.values.get(i + 1);
-                        if (name.equals("at")) {
-                            this.remapAtArray(node.name, method.name + method.desc, targets, value);
-                        } else if (name.equals("cancellable")
-                                || name.equals("expect")
-                                || name.equals("locals")
-                                || name.equals("require")) {
-                            // Nothing to do
-                        } else if (name.equals("method") || name.equals("target")) {
-                            Type[] arguments = Type.getArgumentTypes(method.desc);
-                            boolean expectVoid = false;
-                            boolean foundCallbackInfo = false;
-                            int callbackInfoArgument;
-                            for (callbackInfoArgument = 0; callbackInfoArgument < arguments.length; callbackInfoArgument++) {
-                                Type arg = arguments[callbackInfoArgument];
-                                String descriptor = arg.getDescriptor();
-                                if ((expectVoid = descriptor.equals("L" + CALLBACK_INFO_CLASS + ";")) || descriptor.equals("L" + CALLBACK_INFO_RETURNABLE_CLASS + ";")) {
-                                    foundCallbackInfo = true;
-                                    break;
-                                }
-                            }
-                            if (!foundCallbackInfo) {
-                                throw new IllegalMixinException("@Inject annotated method " + node.name + "." + method.name + method.desc + " lacks type argument " + CALLBACK_INFO_CLASS + " or " + CALLBACK_INFO_RETURNABLE_CLASS);
-                            }
-
-                            final boolean expectVoidFinal = expectVoid; // Lambda workarounds
-                            final int capturedArgumentCount = callbackInfoArgument;
-                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
-                                if (inferredDescriptor.codePointAt(0) != '('
-                                        || expectVoidFinal != (inferredDescriptor.codePointBefore(inferredDescriptor.length()) == 'V')) {
-                                    return false;
-                                }
-
-                                Type[] inferredDescriptorArguments = Type.getArgumentTypes(inferredDescriptor);
-                                if (inferredDescriptorArguments.length < capturedArgumentCount) {
-                                    return false;
-                                }
-
-                                for (int j = 0; j < capturedArgumentCount; j++) {
-                                    if (!arguments[j].getDescriptor().equals(inferredDescriptorArguments[j].getDescriptor())) {
-                                        return false;
-                                    }
-                                }
-                                return true;
-                            });
-                        } else {
-                            this.logUnimplementedFeature("Unimplemented key in @Inject: " + name + " within node " + node.name);
-                        }
-                    }
-                } else if (annot.desc.equals("Lorg/spongepowered/asm/mixin/injection/ModifyArg;")) {
-                    if (mainAnnotation != null) {
-                        throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
-                    }
-                    mainAnnotation = annot.desc;
-                    for (int i = 0; i < annot.values.size(); i += 2) {
-                        String name = (String) annot.values.get(i);
-                        Object value = annot.values.get(i + 1);
-                        if (name.equals("at")) {
-                            this.remapAt(node.name, method.name + method.desc, -1, targets, (AnnotationNode) value);
-                        } else if (name.equals("expect")
-                                || name.equals("index")
-                                || name.equals("require")) {
-                            // Nothing to do
-                        } else if (name.equals("method") || name.equals("target")) {
-                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
-                                return inferredDescriptor.codePointAt(0) == '(';
-                            });
-                        } else {
-                            this.logUnimplementedFeature("Unimplemented key in @ModifyArg: " + name + " within node " + node.name);
-                        }
-                    }
-                } else if (annot.desc.equals("Lorg/spongepowered/asm/mixin/injection/Redirect;")) {
-                    if (mainAnnotation != null) {
-                        throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
-                    }
-                    mainAnnotation = annot.desc;
-                    for (int i = 0; i < annot.values.size(); i += 2) {
-                        String name = (String) annot.values.get(i);
-                        Object value = annot.values.get(i + 1);
-                        if (name.equals("at")) {
-                            this.remapAt(node.name, method.name + method.desc, -1, targets, (AnnotationNode) value);
-                        } else if (name.equals("slice")) {
-                            this.remapSlice(node.name, node.name + method.desc, -1, targets, (AnnotationNode) value);
-                        } else if (name.equals("expect")
-                                || name.equals("allow")
-                                || name.equals("require")) {
-                            // Nothing to do
-                        } else if (name.equals("method") || name.equals("target")) {
-                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
-                                return inferredDescriptor.codePointAt(0) == '(';
-                            });
-                        } else {
-                            this.logUnimplementedFeature("Unimplemented key in @Redirect: " + name + " within node " + node.name);
-                        }
-                    }
-                } else if (annot.desc.equals("Lcom/llamalad7/mixinextras/injector/ModifyReturnValue;")) {
-                    if (mainAnnotation != null) {
-                        throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
-                    }
-                    mainAnnotation = annot.desc;
-                    for (int i = 0; i < annot.values.size(); i += 2) {
-                        String name = (String) annot.values.get(i);
-                        Object value = annot.values.get(i + 1);
-                        if (name.equals("at")) {
-                            this.remapAtArray(node.name, method.name + method.desc, targets, value);
-                        } else if (name.equals("expect")
-                                || name.equals("allow")
-                                || name.equals("require")) {
-                            // Nothing to do
-                        } else if (name.equals("method") || name.equals("target")) {
-                            this.remapMethodSelectorList(value, node, method, targets, (inferredDescriptor) -> {
-                                return inferredDescriptor.codePointAt(0) == '(';
-                            });
-                        } else {
-                            this.logUnimplementedFeature("Unimplemented key in @ModifyReturnValue: " + name + " within node " + node.name);
-                        }
-                    }
                 } else {
-                    this.logUnimplementedFeature("Unknown mixin annotation on method " + node.name + "." + method.name + method.desc + ": " + annot.desc);
+                    AnnotationRemapper remapper = AnnotationRemapper.ANNOTATION_REMAPPERS.get(annot.desc);
+                    if (remapper != null) {
+                        if (mainAnnotation != null) {
+                            throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
+                        }
+                        mainAnnotation = annot.desc;
+                        remapper.remapAnnotation(new RemapContext(this, node.name, method, targets), annot);
+                    } else {
+                        this.logUnimplementedFeature("Unknown mixin annotation on method " + node.name + "." + method.name + method.desc + ": " + annot.desc);
+                    }
                 }
             }
         }
@@ -816,7 +702,7 @@ public class MicromixinRemapper {
         }
     }
 
-    private void remapMethodSelectorList(Object selectors, @NotNull ClassNode originNode, MethodNode originMethod, @NotNull Collection<String> targets, @Nullable Predicate<@NotNull String> inferredDescriptorPredicate) throws IllegalMixinException, MissingFeatureException {
+    void remapMethodSelectorList(Object selectors, @NotNull String originName, MethodNode originMethod, @NotNull Collection<String> targets, @Nullable Predicate<@NotNull String> inferredDescriptorPredicate) throws IllegalMixinException, MissingFeatureException {
         @SuppressWarnings("unchecked")
         ListIterator<Object> it = ((List<Object>) selectors).listIterator();
         while (it.hasNext()) {
@@ -824,14 +710,14 @@ public class MicromixinRemapper {
             Object o = it.next();
 
             if (o instanceof AnnotationNode) {
-                this.remapDescAnnotation("Error while remapping @Desc selector in method " + originNode.name + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", targets, (AnnotationNode) o, false);
+                this.remapDescAnnotation("Error while remapping @Desc selector in method " + originName + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", targets, (AnnotationNode) o, false);
             } else {
-                it.set((Object) this.remapTargetSelector("Error while remapping target selector in method " + originNode.name + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", (String) o, targets, inferredDescriptorPredicate));
+                it.set((Object) this.remapTargetSelector("Error while remapping target selector in method " + originName + "." + originMethod.name + originMethod.desc + ", index " + idx + ": ", (String) o, targets, inferredDescriptorPredicate));
             }
         }
     }
 
-    private void remapSlice(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
+    void remapSlice(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
         for (int i = 0; i < annot.values.size(); i += 2) {
             switch ((String) annot.values.get(i)) {
             case "from":
