@@ -859,7 +859,39 @@ public class MicromixinRemapper {
         }
 
         if (owner == null || name == null || desc == null) {
-            this.logUnimplementedFeature(errorPrefix + "The provided explicit target selector string is not fully qualified (that is the member either lacks a name, descriptor or owner or a combination thereof). Without the fully qualified member, the selector string cannot be adequately renamed as the actually targetted member is highly context-dependent. As such, this feature is not supported in micromixin-remapper (but it is supported in micromixin-transformer and other mixin implementations!). Potential ways of mitigating this issue involve: Implementing this feature yourself, using the fully qualified target selector or using @Desc (@Desc has more strongly defined behaviour when it comes to unspecified parts of the selector, but may not be recommended in most toolchains. However it's use is acceptable and even recommended within the stianloader toolchain - while minecraft-specific toolchains generally advise against the use of @Desc).");
+            String inferrenceMeta = "  Inferred triple: " + Objects.toString(owner, Objects.toString(targets)) + "." + Objects.toString(name) + ":" + Objects.toString(desc);
+            if (owner != null) {
+                inferrenceMeta += "\n  Listed candidate members: " + this.lister.tryInferMember(owner, name, desc);
+                try {
+                    inferrenceMeta += "\n  All methods in the owner class: " + this.lister.getReportedClassMembers(owner);
+                } catch (UnsupportedOperationException e) {
+                    inferrenceMeta += "\n  Remapper does not support listing members in class. See MemberLister#getReportedClassMembers(String) for further details.";
+                }
+            } else if (targets == null) {
+                inferrenceMeta += "\n  Unable to list candidate members: Target(s) of mixin class unknown and the target class was not explicitly defined.";
+            } else {
+                Set<MemberRef> inferredRefs = new LinkedHashSet<>();
+                for (String target : targets) {
+                    inferredRefs.addAll(this.lister.tryInferMember(target, name, desc));
+                }
+                inferrenceMeta += "\n  Listed candidate members: " + inferredRefs;
+                try {
+                    Collection<MemberRef> refs = new LinkedHashSet<>();
+                    for (String target : targets) {
+                        Collection<MemberRef> reported = this.lister.getReportedClassMembers(target);
+                        if (reported != null) {
+                            refs.addAll(reported);
+                        } else {
+                            inferrenceMeta += "\n  Target class " + target + " is not known to the remapper (wrong source namespace?).";
+                        }
+                    }
+                    inferrenceMeta += "\n  All methods in the owner class: " + refs;
+                } catch (UnsupportedOperationException e) {
+                    inferrenceMeta += "\n  Remapper does not support listing members in class. See MemberLister#getReportedClassMembers(String) for further details.";
+                }
+            }
+
+            this.logUnimplementedFeature(errorPrefix + "The provided explicit target selector string is not fully qualified (that is the member either lacks a name, descriptor or owner or a combination thereof). Without the fully qualified member, the selector string cannot be adequately renamed as the actually targetted member is highly context-dependent. As such, this feature is not supported in micromixin-remapper (but it is supported in micromixin-transformer and other mixin implementations!). Potential ways of mitigating this issue involve: Implementing this feature yourself, using the fully qualified target selector or using @Desc (@Desc has more strongly defined behaviour when it comes to unspecified parts of the selector, but may not be recommended in most toolchains. However it's use is acceptable and even recommended within the stianloader toolchain - while minecraft-specific toolchains generally advise against the use of @Desc).\nInferrence metainformation:\n" + inferrenceMeta);
             return targetSelector;
         }
 

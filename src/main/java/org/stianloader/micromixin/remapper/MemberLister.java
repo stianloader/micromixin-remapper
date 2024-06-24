@@ -20,6 +20,38 @@ import org.stianloader.remapper.MemberRef;
 public interface MemberLister {
 
     /**
+     * List all known members of a given class.
+     *
+     * <p>Solely used for debugging purposes, that is this method
+     * will only be used to guide the end user when something went wrong
+     * in the remapping process, typically in conjunction with interactions
+     * related to {@link #tryInferMember(String, String, String)}.
+     *
+     * <p>The {@link MemberRef} stored in the returned collection are in the source
+     * namespace, as is the input parameter {@code owner}.
+     *
+     * <p>Implementors are allowed to throw a {@link UnsupportedOperationException}
+     * unconditionally (in fact, this is the default implementation),
+     * if the implementation of {@link MemberLister} does not support the
+     * specific functionality. Doing so should have no impact on the
+     * actual remapping process, but will result in degraded error reporting.
+     *
+     * <p>Similarly, if the implementation cannot find any member from the class
+     * (that is, to the implementation the class does not exist, since a class should
+     * always have at least one constructor and the clinit method), {@code null} is returned.
+     * Here too, no impact on the remapping process should occur outside of
+     * degraded error reporting.
+     *
+     * @param owner The class defining the members that need to be listed.
+     * @return All known members within the given class, or null if the class is not known.
+     * @throws UnsupportedOperationException
+     */
+    @Nullable
+    default Collection<MemberRef> getReportedClassMembers(@NotNull String owner) throws UnsupportedOperationException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
      * Check whether a member with the given name and descriptor exists
      * with the class <code>clazz</code> or any of it's supertypes. Subtypes
      * should not be considered.
@@ -47,7 +79,8 @@ public interface MemberLister {
      * should return all members that match within the returned {@link Collection}. Similarly, if no
      * members match the criterions, then an empty collection should be returned.
      *
-     * <p>The {@link MemberRef} stored in the collection are in the source namespace, as are the 
+     * <p>The {@link MemberRef} stored in the collection are in the source namespace, as are the
+     * input parameters of this method.
      *
      * <p>This method is used for purposes of remapping string target selectors. That being said, at this
      * point in time it is not being used for mapping string target selectors within <code>&#64;At</code> annotations.
