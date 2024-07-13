@@ -202,6 +202,8 @@ public class MicromixinRemapper {
                 idxDesc = i;
             } else if (name.equals("slice")) {
                 // Slices don't need to be remapped to my knowledge, nor are they relevant to the remapping process.
+            } else if (name.equals("shift")) {
+                // Shifts can stay as-is
             } else if (name.equals("target")) {
                 idxTarget = i;
             } else {
