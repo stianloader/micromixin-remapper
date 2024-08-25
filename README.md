@@ -1,7 +1,7 @@
 # Micromixin-remapper
 
 Micromixin-remapper is an extension to the stianloader-remapper API to provide the ability
-of remapping Mixins. Do note however that stianloader-remapper takes the liberty of remapping
+of remapping Mixins. Do note however that micromixin-remapper takes the liberty of remapping
 mixin classes the way it chooses - which is why behaviour may change compared to tiny-remapper's
 mixin extension or the official mixin annotation processor (note that unlike the
 annotation processor, this library is not capable of generating refmaps. As such, the remapping
@@ -9,7 +9,9 @@ process is much more similar to tiny-remapper).
 
 The behaviour of the remapper is done on a "best-fit" basis - that is if it cannot find a best fit,
 it will fail in a fail-fast manner. Such behaviour ensures predictability and lowers user
-frustration in the long run.
+frustration in the long run. This best fit is usually a what I find most logical as a user,
+though within reason as it's sometimes difficult to impossible to replicate this most
+logical approach.
 
 ## Maven
 
@@ -23,11 +25,11 @@ of the repository: https://stianloader.org/maven/org/stianloader/micromixin-rema
 
 The goal of micromixin-remapper is to support everything that is supported by
 micromixin-transformer. However, at this point in time micromixin-remapper only
-supports the pure fundementals for the mixin specification and will likely fail
-to remap almost any mixin. At the current point in time the goal of mine is to
-explore the performance implications of moving away from tiny-remapper rather than
-actually supporting the entire range of mixins.
-
+supports the pure fundementals for the mixin specification. This suffices to
+remap a large quantity of mixins, and fully supports remapping all known
+mixins used in galimulator modding. That being said, it may fail for more exotic
+usecases. If someone is willing enough to report a bug, the missing featureset can
+be amended though.
 
 Micromixin-remapper is rather likely to struggle with target selectors (often the
 `method` element of a mixin handler annotation or the `@Desc` annotation) when a

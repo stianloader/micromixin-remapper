@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.stianloader</groupId>
     <artifactId>micromixin-remapper</artifactId>
-    <version>0.1.1</version>
+    <version>0.2.0</version>
     <name>Micromixin Remapper</name>
     <description>Statically remap mixin classes using OW2 ASM ClassNodes</description>
 
@@ -33,6 +33,8 @@
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
+
+        <!-- https://stianloader.org/maven/org/stianloader/stianloader-remapper/ -->
         <dependency>
             <groupId>org.stianloader</groupId>
             <artifactId>stianloader-remapper</artifactId>
@@ -84,7 +86,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.4.1</version>
+                <version>3.4.2</version>
                 <configuration>
                     <archive>
                         <manifestEntries>
@@ -148,7 +150,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.7.0</version>
+                <version>3.8.0</version>
                 <configuration>
                     <!-- I have no idea what I'm doing but it's working -->
                     <sourcepath>${project.build.sourceDirectory}</sourcepath>
@@ -166,7 +168,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
-                <version>3.2.4</version>
+                <version>3.2.5</version>
                 <executions>
                     <execution>
                         <id>sign-artifacts</id>

@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.ApiStatus.OverrideOnly;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.MustBeInvokedByOverriders;
@@ -21,7 +22,6 @@ import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.stianloader.micromixin.remapper.AnnotationRemapper.RemapContext;
 import org.stianloader.micromixin.remapper.selectors.AtSelector;
 import org.stianloader.micromixin.remapper.selectors.ConstantSelector;
 import org.stianloader.micromixin.remapper.selectors.FieldSelector;
@@ -37,9 +37,12 @@ import org.stianloader.remapper.Remapper;
 public class MicromixinRemapper {
 
     @NotNull
-    static final String CALLBACK_INFO_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfo";
+    @Internal
+    public static final String CALLBACK_INFO_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfo";
+
     @NotNull
-    static final String CALLBACK_INFO_RETURNABLE_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable";
+    @Internal
+    public static final String CALLBACK_INFO_RETURNABLE_CLASS = "org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable";
 
     @NotNull
     private final MemberLister lister;
@@ -186,7 +189,8 @@ public class MicromixinRemapper {
         }
     }
 
-    void remapAt(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
+    @Internal
+    public void remapAt(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
         int idxValue = 0;
         int idxArgs = 0;
         int idxTarget = 0;
@@ -202,7 +206,7 @@ public class MicromixinRemapper {
                 idxDesc = i;
             } else if (name.equals("slice")) {
                 // Slices don't need to be remapped to my knowledge, nor are they relevant to the remapping process.
-            } else if (name.equals("shift")) {
+            } else if (name.equals("shift") || name.equals("by")) {
                 // Shifts can stay as-is
             } else if (name.equals("target")) {
                 idxTarget = i;
@@ -248,7 +252,8 @@ public class MicromixinRemapper {
         }
     }
 
-    void remapAtArray(@NotNull String owner, @NotNull String method, @NotNull Collection<String> targets, Object nodes) throws IllegalMixinException, MissingFeatureException {
+    @Internal
+    public void remapAtArray(@NotNull String owner, @NotNull String method, @NotNull Collection<String> targets, Object nodes) throws IllegalMixinException, MissingFeatureException {
         int ordinal = 0;
         for (Object node : (Iterable<?>) nodes) {
             this.remapAt(owner, method, ordinal++, targets, (AnnotationNode) node);
@@ -580,7 +585,8 @@ public class MicromixinRemapper {
         if (method.visibleAnnotations != null) {
             for (AnnotationNode annot : method.visibleAnnotations) {
                 if (!annot.desc.startsWith("Lorg/spongepowered/asm/mixin/")
-                        && !annot.desc.startsWith("Lcom/llamalad7/mixinextras/injector/")) {
+                        && !annot.desc.startsWith("Lcom/llamalad7/mixinextras/injector/")
+                        && !annot.desc.startsWith("Lorg/stianloader/micromixin/annotations/")) {
                     continue;
                 }
 
@@ -704,9 +710,10 @@ public class MicromixinRemapper {
         }
     }
 
-    void remapMethodSelectorList(Object selectors, @NotNull String originName, MethodNode originMethod, @NotNull Collection<String> targets, @Nullable Predicate<@NotNull String> inferredDescriptorPredicate) throws IllegalMixinException, MissingFeatureException {
+    @Internal
+    public void remapMethodSelectorList(List<?> selectors, @NotNull String originName, MethodNode originMethod, @NotNull Collection<String> targets, @Nullable Predicate<@NotNull String> inferredDescriptorPredicate) throws IllegalMixinException, MissingFeatureException {
         @SuppressWarnings("unchecked")
-        ListIterator<Object> it = ((List<Object>) selectors).listIterator();
+        ListIterator<Object> it = (ListIterator<Object>) selectors.listIterator();
         while (it.hasNext()) {
             int idx = it.nextIndex();
             Object o = it.next();
@@ -719,7 +726,8 @@ public class MicromixinRemapper {
         }
     }
 
-    void remapSlice(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
+    @Internal
+    public void remapSlice(@NotNull String owner, @NotNull String member, int ordinal, @NotNull Collection<String> targets, AnnotationNode annot) throws IllegalMixinException, MissingFeatureException {
         for (int i = 0; i < annot.values.size(); i += 2) {
             switch ((String) annot.values.get(i)) {
             case "from":
