@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.MustBeInvokedByOverriders;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -133,7 +134,8 @@ public class MicromixinRemapper {
                             + ". The interface does not allow remapping it's members (see MicromixinRemapper#forbidRemappingInterfaceMembers). Potential ways of resolving this issue include:\n"
                             + "\t1. Rename the method in the interface or alter it's descriptor.\n"
                             + "\t2. Do not implement the interface in the mixin.\n"
-                            + "\t3. Report this behaviour as unintended to the micromixin-remapper developers (please also include the mixin itself and a short statement on why the behaviour should change)");
+                            + "\t3. Use @CanonicalOverwrite (micromixin-transformer and micromixin-backports exclusive feature).\n"
+                            + "\t4. Report this behaviour as unintended to the micromixin-remapper developers (please also include the mixin itself and a short statement on why the behaviour should change)");
                 }
             }
         }
@@ -595,11 +597,14 @@ public class MicromixinRemapper {
                         throw new IllegalMixinException("Illegal mixin method " + node.name + "." + method.name + method.desc + ": The mixin handler is annotated with two or more incompatible annotations: " + mainAnnotation + " and " + annot.desc);
                     }
                     mainAnnotation = annot.desc;
-                    String remapPrefix = "shadow$";
+                    String remapPrefix = (method.access & Opcodes.ACC_STATIC) == 0 ? "shadow$" : null;
                     for (int i = 0; annot.values != null && i < annot.values.size(); i += 2) {
                         String name = (String) annot.values.get(i);
                         Object value = annot.values.get(i + 1);
                         if (name.equals("prefix")) {
+                            if ((method.access & Opcodes.ACC_STATIC) != 0) {
+                                this.logUnimplementedFeature("The static @Shadow-annotated mixin method " + node.name + "." + method.name + method.desc + " defines a prefix.  However, due to a bug in the spongeian mixin implementation INVOKESTATIC calls will not be redirected to the non-prefixed member you are targetting, effectively causing a crash at runtime. At this point in time micromixin-transformer replicates this issue, but this behaviour is subject to change.");
+                            }
                             remapPrefix = (String) value;
                         } else if (name.equals("aliases")) {
                             @SuppressWarnings("unchecked")
@@ -631,7 +636,7 @@ public class MicromixinRemapper {
                     }
 
                     String shadowName = method.name;
-                    if (method.name.startsWith(remapPrefix)) {
+                    if (remapPrefix != null && method.name.startsWith(remapPrefix)) {
                         shadowName = method.name.substring(remapPrefix.length());
                     }
 
@@ -669,7 +674,8 @@ public class MicromixinRemapper {
                     }
 
                     if (remappedShadowName != null) {
-                        this.sink.remapMember(new MemberRef(node.name, method.name, method.desc), remapPrefix + remappedShadowName);
+                        String remappedName = (method.access & Opcodes.ACC_STATIC) == 0 ? remapPrefix + remappedShadowName : remappedShadowName;
+                        this.sink.remapMember(new MemberRef(node.name, method.name, method.desc), remappedName);
                     }
                 } else if (annot.desc.equals("Lorg/spongepowered/asm/mixin/Unique;")) {
                     if (mainAnnotation != null) {
