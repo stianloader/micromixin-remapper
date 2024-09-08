@@ -208,8 +208,8 @@ public class MicromixinRemapper {
                 idxDesc = i;
             } else if (name.equals("slice")) {
                 // Slices don't need to be remapped to my knowledge, nor are they relevant to the remapping process.
-            } else if (name.equals("shift") || name.equals("by")) {
-                // Shifts can stay as-is
+            } else if (name.equals("shift") || name.equals("by") || name.equals("opcode")) {
+                // Shifts and opcode can stay as-is
             } else if (name.equals("target")) {
                 idxTarget = i;
             } else {
@@ -916,9 +916,9 @@ public class MicromixinRemapper {
         remapped.append(this.lookup.getRemappedClassName(owner));
         remapped.appendCodePoint(';');
         if (desc.codePointAt(0) == '(') {
-            remapped.appendCodePoint(' ').append(this.lookup.getRemappedMethodName(owner, name, desc));
+            remapped.append(this.lookup.getRemappedMethodName(owner, name, desc)).appendCodePoint(' ');
         } else {
-            remapped.appendCodePoint(':').append(this.lookup.getRemappedFieldName(owner, name, desc));
+            remapped.append(this.lookup.getRemappedFieldName(owner, name, desc)).appendCodePoint(':');
         }
         Remapper.remapSignature(this.lookup, desc, remapped);
 
