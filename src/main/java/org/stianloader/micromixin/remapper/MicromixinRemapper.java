@@ -28,6 +28,7 @@ import org.stianloader.micromixin.remapper.selectors.ConstantSelector;
 import org.stianloader.micromixin.remapper.selectors.FieldSelector;
 import org.stianloader.micromixin.remapper.selectors.HeadSelector;
 import org.stianloader.micromixin.remapper.selectors.InvokeSelector;
+import org.stianloader.micromixin.remapper.selectors.NewSelector;
 import org.stianloader.micromixin.remapper.selectors.ReturnSelector;
 import org.stianloader.micromixin.remapper.selectors.TailSelector;
 import org.stianloader.remapper.MappingLookup;
@@ -186,6 +187,9 @@ public class MicromixinRemapper {
         case "org.spongepowered.asm.mixin.injection.points.BeforeFieldAccess":
         case "FIELD":
             return FieldSelector.INSTANCE;
+        case "org.spongepowered.asm.mixin.injection.points.BeforeNew":
+        case "NEW":
+            return NewSelector.INSTANCE;
         default:
             return null;
         }
