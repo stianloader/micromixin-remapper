@@ -1,6 +1,8 @@
 package org.stianloader.micromixin.remapper.element;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import org.jetbrains.annotations.NotNull;
@@ -34,7 +36,7 @@ public class ImplicitTargetElementResolver implements BiConsumer<@NotNull RemapC
             descAnnotation.values.add("value");
             descAnnotation.values.add(context.mixinMethod.name);
             descAnnotation.values.add("args");
-            descAnnotation.values.add(Type.getArgumentTypes(context.mixinMethod.desc));
+            descAnnotation.values.add(new ArrayList<>(Arrays.asList(Objects.requireNonNull(Type.getArgumentTypes(context.mixinMethod.desc)))));
             descAnnotation.values.add("ret");
             descAnnotation.values.add(Type.getReturnType(context.mixinMethod.desc));
             annotation.values.add(descAnnotation);
